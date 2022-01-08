@@ -1,48 +1,205 @@
-import React, { Component } from 'react';
-import logo from '../logo.png';
-import './App.css';
+import React, { Component, useState } from "react";
+import logo from "../logo.png";
+import SocialNetwork from "../abis/SocialNetwork.json"; //smart contract
+import "./App.css";
+import Web3 from "web3";
 
+// Address :  ("0xdac30a4dA00d5D4254b55Ece4B3564Fe170Fc53d");
 class App extends Component {
-  render() {
-    return (
-      <div>
-        <nav className="navbar navbar-dark fixed-top bg-dark flex-md-nowrap p-0 shadow">
-          <a
-            className="navbar-brand col-sm-3 col-md-2 mr-0"
-            href="http://www.dappuniversity.com/bootcamp"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Dapp University
-          </a>
-        </nav>
-        <div className="container-fluid mt-5">
-          <div className="row">
-            <main role="main" className="col-lg-12 d-flex text-center">
-              <div className="content mr-auto ml-auto">
-                <a
-                  href="http://www.dappuniversity.com/bootcamp"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <img src={logo} className="App-logo" alt="logo" />
-                </a>
-                <h1>Dapp University Starter Kit</h1>
-                <p>
-                  Edit <code>src/components/App.js</code> and save to reload.
-                </p>
-                <a
-                  className="App-link"
-                  href="http://www.dappuniversity.com/bootcamp"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  LEARN BLOCKCHAIN <u><b>NOW! </b></u>
-                </a>
-              </div>
-            </main>
+  async componentWillMount() {
+    this.setState({ isLoading: true });
+    await this.loadWeb3();
+    await this.loadBlockchainData();
+    await this.getAllPosts();
+    this.setState({ isLoading: false });
+  }
+
+  constructor(props) {
+    super(props);
+    this.state = {
+      account: "",
+      socialNetwork: null,
+      posts: [],
+      isLoading: false,
+    };
+  }
+  //takes connection from metamask and wires to web3
+  //can fetch account information from wallet with web3
+  async loadWeb3() {
+    if (window.ethereum) {
+      window.web3 = new Web3(window.ethereum);
+      await window.ethereum.enable();
+    }
+
+    // Legacy dapp browsers...
+    else if (window.web3) {
+      window.web3 = new Web3(window.web3.currentProvider);
+    }
+    // Non-dapp browsers...
+    else {
+      alert(
+        "Non-Ethereum browser detected. You should consider trying MetaMask!"
+      );
+    }
+  }
+
+  async loadBlockchainData() {
+    const web3 = window.web3;
+
+    const accounts = await web3.eth.getAccounts();
+
+    console.log("web 3 accounts : ", accounts);
+    this.setState({ account: accounts[0] });
+
+    //fetch networks
+    //address
+    //abi
+    const networkId = await web3.eth.net.getId();
+
+    const networkData = SocialNetwork.networks[networkId];
+    if (networkData) {
+      console.log("network id : ", networkId);
+
+      //to retrieve a contract, we need the abi, and the address that the contract is on
+      const socialNetwork = web3.eth.Contract(
+        SocialNetwork.abi,
+        networkData.address
+      );
+
+      this.setState({ socialNetwork });
+
+      console.log(socialNetwork);
+    } else {
+      alert("social network blockchain has not been deployed yet...");
+    }
+  }
+
+  async getAllPosts() {
+    const { socialNetwork } = this.state;
+    const postCount = await socialNetwork.methods.postCount().call();
+
+    const postsList = [];
+    for (let i = 0; i < postCount; i++) {
+      const post = await socialNetwork.methods.posts(i).call();
+      // postsList.push(post);
+      console.log("post : ", post);
+
+      this.setState({ posts: [...this.state.posts, post] });
+    }
+    console.log("post count :", postCount);
+    // this.setState({ posts });
+  }
+
+  renderCards() {
+    return this.state.posts.map((post, key) => {
+      return (
+        <div class="card">
+          {/* <img class="card-img-top" src="..." alt="Card image cap" /> */}
+          <div class="card-body">
+            <h5 class="card-title">{post.author}</h5>
+            <p class="card-text">{post.content}</p>
+            <small className="float-left mt-5 text-muted">
+              TIP :{" "}
+              {window.web3.utils.fromWei(post.tipAmount.toString(), "Ether")}{" "}
+              ETH
+            </small>
+            <button
+              href="#"
+              class="btn btn-primary"
+              onClick={(e) => {
+                let id = post.id;
+
+                let tipAmount = window.web3.utils.toWei("0.1", "Ether");
+
+                this.tipPost(id, tipAmount);
+              }}
+            >
+              TIP 1 ETH
+            </button>
           </div>
         </div>
+      );
+    });
+  }
+
+  sortPosts() {
+    const { posts } = this.state;
+
+    posts.sort((a, b) => b.tipAmount - a.tipAmount);
+
+    this.setState({ posts });
+  }
+
+  createPost(content) {
+    const { socialNetwork, account } = this.state;
+
+    console.log("content : ", content);
+    this.setState({ isLoading: true });
+    socialNetwork.methods
+      .createPost(content)
+      .send({ from: account })
+      .once("receipt", (receipt) => {
+        this.setState({ isLoading: false });
+      });
+  }
+
+  tipPost(id, tipAmount) {
+    this.setState({ isLoading: true });
+    this.state.socialNetwork.methods
+      .tipPost(id)
+      .send({ from: this.state.account, value: tipAmount })
+      .then((data) => {
+        console.log("done processing :: ", data);
+        this.setState({ isLoading: false });
+        this.sortPosts();
+      });
+  }
+
+  renderSubmit() {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const content = this.postContent.value;
+          this.createPost(content);
+        }}
+      >
+        <div className="form-group mr-sm-2">
+          <input
+            id="postContent"
+            type="text"
+            className="form-control"
+            placeholder="What's up?"
+            ref={(input) => {
+              this.postContent = input;
+            }}
+            required
+          ></input>
+        </div>
+        <button type="submit" className="btn btn-primary btn-block">
+          Share
+        </button>
+      </form>
+    );
+  }
+
+  render() {
+    const { isLoading } = this.state;
+    return (
+      <div>
+        Account being used : {this.state.account}
+        <br />
+        {isLoading ? (
+          <div>Loading...</div>
+        ) : (
+          <div>
+            {/* <button className="mr-sm-2" onClick={this.sortPosts}>
+              Sort Posts by Tip Amount
+            </button> */}
+            {this.renderSubmit()}
+            {this.renderCards()}
+          </div>
+        )}
       </div>
     );
   }
