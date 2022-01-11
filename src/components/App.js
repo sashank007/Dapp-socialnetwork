@@ -16,6 +16,7 @@ class App extends Component {
 
   constructor(props) {
     super(props);
+    // this.buyAmountInput = React.createRef();
     this.state = {
       account: "",
       socialNetwork: null,
@@ -79,7 +80,7 @@ class App extends Component {
     const postCount = await socialNetwork.methods.postCount().call();
 
     const postsList = [];
-    for (let i = 0; i < postCount; i++) {
+    for (let i = 1; i <= postCount; i++) {
       const post = await socialNetwork.methods.posts(i).call();
       // postsList.push(post);
       console.log("post : ", post);
@@ -96,10 +97,11 @@ class App extends Component {
         <div class="card">
           {/* <img class="card-img-top" src="..." alt="Card image cap" /> */}
           <div class="card-body">
-            <h5 class="card-title">{post.author}</h5>
-            <p class="card-text">{post.content}</p>
+            <p class="card-text" style={{ fontSize: 14 + post.tipAmount }}>
+              {post.content}
+            </p>
             <small className="float-left mt-5 text-muted">
-              TIP :{" "}
+              STAKED AMOUNT :{" "}
               {window.web3.utils.fromWei(post.tipAmount.toString(), "Ether")}{" "}
               ETH
             </small>
@@ -114,8 +116,26 @@ class App extends Component {
                 this.tipPost(id, tipAmount);
               }}
             >
-              TIP 1 ETH
+              STAKE 0.1 ETH
             </button>
+            <br />
+            <button
+              href="#"
+              class="btn btn-primary"
+              onClick={(e) => {
+                let id = post.id;
+
+                let buyAmount = window.web3.utils.toWei("1", "Ether");
+
+                this.buyPost(id, buyAmount);
+              }}
+            >
+              BUY POST FOR 1 ETH
+            </button>
+            <br />
+          </div>
+          <div>
+            <p>This post is owned by : {post.author}</p>
           </div>
         </div>
       );
@@ -155,6 +175,18 @@ class App extends Component {
       });
   }
 
+  buyPost(id, buyAmount) {
+    this.setState({ isLoading: true });
+    this.state.socialNetwork.methods
+      .buyPost(id)
+      .send({ from: this.state.account, value: buyAmount })
+      .then((data) => {
+        console.log("done buying post :: ", data);
+        this.setState({ isLoading: false });
+        this.sortPosts();
+      });
+  }
+
   renderSubmit() {
     return (
       <form
@@ -178,6 +210,34 @@ class App extends Component {
         </div>
         <button type="submit" className="btn btn-primary btn-block">
           Share
+        </button>
+      </form>
+    );
+  }
+
+  renderBuy() {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const content = this.postAmount.value;
+          this.createPost(content);
+        }}
+      >
+        <div className="form-group mr-sm-5">
+          <input
+            id="postAmount"
+            type="text"
+            className="form-control"
+            placeholder="Amount to buy post?"
+            ref={(input) => {
+              this.postAmount = input;
+            }}
+            required
+          ></input>
+        </div>
+        <button type="submit" className="btn btn-primary btn-block">
+          Buy
         </button>
       </form>
     );
