@@ -79,7 +79,6 @@ class App extends Component {
     const { socialNetwork } = this.state;
     const postCount = await socialNetwork.methods.postCount().call();
 
-    const postsList = [];
     for (let i = 1; i <= postCount; i++) {
       const post = await socialNetwork.methods.posts(i).call();
       // postsList.push(post);
@@ -87,19 +86,19 @@ class App extends Component {
 
       this.setState({ posts: [...this.state.posts, post] });
     }
-    console.log("post count :", postCount);
-    // this.setState({ posts });
   }
 
   renderCards() {
     return this.state.posts.map((post, key) => {
+      const weiValue = parseInt(post.tipAmount._hex);
+      const etherValue = window.web3.utils.fromWei(String(weiValue), "ether");
+
+      console.log("ether value  :", etherValue);
       return (
         <div class="card">
           {/* <img class="card-img-top" src="..." alt="Card image cap" /> */}
-          <div class="card-body">
-            <p class="card-text" style={{ fontSize: 14 + post.tipAmount }}>
-              {post.content}
-            </p>
+          <div class="card-body" style={{ fontSize: 14 + etherValue * 10 }}>
+            <p class="card-text">{post.content}</p>
             <small className="float-left mt-5 text-muted">
               STAKED AMOUNT :{" "}
               {window.web3.utils.fromWei(post.tipAmount.toString(), "Ether")}{" "}
@@ -253,9 +252,6 @@ class App extends Component {
           <div>Loading...</div>
         ) : (
           <div>
-            {/* <button className="mr-sm-2" onClick={this.sortPosts}>
-              Sort Posts by Tip Amount
-            </button> */}
             {this.renderSubmit()}
             {this.renderCards()}
           </div>
